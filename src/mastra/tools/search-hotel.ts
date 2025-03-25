@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import z from 'zod'
 import axiosInstance from '../utils/axios';
+import { Hotel, HotelsResponse, SearchHotelsResponse } from '../types';
 
 export const searchHotelsTool = createTool({
   id: 'search-hotels',
@@ -8,34 +9,49 @@ export const searchHotelsTool = createTool({
   inputSchema: z.object({
     placeId: z.string().describe('The place ID to search for hotels'),
   }),
-  execute: async ({ context }) => {
+  outputSchema: z.object({
+    success: z.boolean(),
+    data: z.array(z.object({
+      id: z.string().describe('Unique ID of a hotel used to retrieve rates for it'),
+      name: z.string(),
+      hotelDescription: z.string(),
+      chain: z.string(),
+      currency: z.string(),
+      country: z.string(),
+      city: z.string(),
+      latitude: z.number(),
+      longitude: z.number(),
+      address: z.string(),
+      zip: z.string(),
+      main_photo: z.string(),
+      thumbnail: z.string(),
+      stars: z.number(),
+      rating: z.number(),
+      reviewCount: z.number()
+    })).optional(),
+    error: z.string().optional()
+  }),
+  execute: async ({ context }): Promise<SearchHotelsResponse> => {
     try {
       const { placeId } = context;
 
       // Call the LiteAPI to search for hotels
-      const response = await axiosInstance.get('/data/hotels', {
+      const response = await axiosInstance.get<HotelsResponse>('/data/hotels', {
         params: {
           placeId,
         },
       });
 
+      const hotels: Hotel[] = response.data.data
+
       return {
         success: true,
-        hotels: response.data.data.slice(0, 5).map(hotel => ({
-          id: hotel.id,
-          name: hotel.name,
-          hotelDescription: hotel.hotelDescription,
-          chain: hotel.chain,
-          address: hotel.address,
-          stars: hotel.stars,
-          rating: hotel.rating,
-          reviewCount: hotel.reviewCount,
-        })) // Return the list of hotels
+        data: hotels.slice(0, 5) // Limit to first 5 hotels as trivial implementation
       };
     } catch (error) {
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   },
